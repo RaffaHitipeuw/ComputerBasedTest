@@ -51,7 +51,7 @@ function ConfirmationCard({ onAnotherResponse }) {
   )
 }
 
-function SecurityOverlay({ warningCount, onReactivate }) {
+function SecurityOverlay({ warningCount, securityReason, isOffline, onReactivate }) {
   return (
     <div
       role="dialog"
@@ -74,8 +74,13 @@ function SecurityOverlay({ warningCount, onReactivate }) {
           Mode keamanan ujian aktif
         </h2>
         <p style={{ margin: '0 0 8px', lineHeight: 1.6 }}>
-          Fokus halaman berubah atau mode layar penuh ditutup. Kembali ke halaman ujian untuk melanjutkan.
+          {securityReason || 'Fokus halaman berubah atau mode layar penuh ditutup.'}
         </p>
+        {isOffline && (
+          <p style={{ margin: '0 0 8px', color: '#ffcfcb', lineHeight: 1.6 }}>
+            Ujian dibekukan. Jangan tutup halaman; ujian akan aktif kembali setelah koneksi tersambung.
+          </p>
+        )}
         <p style={{ margin: '0 0 20px', color: '#d9d5ff', fontSize: '14px' }}>
           Peringatan: {warningCount}
         </p>
@@ -106,6 +111,8 @@ function App() {
     containerRef,
     warningCount,
     isSecurityOverlayVisible,
+    isOffline,
+    securityReason,
     activateSecureMode,
   } = useExamSecurity()
   const { tamperCount, hasTampering, clearTampering } = useExamHardening()
@@ -158,9 +165,11 @@ function App() {
           />
         )}
 
-        {(isSecurityOverlayVisible || hasTampering) && (
+        {(isSecurityOverlayVisible || hasTampering || isOffline) && (
           <SecurityOverlay
             warningCount={warningCount + tamperCount}
+            securityReason={securityReason}
+            isOffline={isOffline}
             onReactivate={reactivateSecurity}
           />
         )}

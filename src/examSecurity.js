@@ -24,10 +24,13 @@ export function useExamSecurity() {
   const containerRef = useRef(null)
   const [isSecurityOverlayVisible, setIsSecurityOverlayVisible] = useState(false)
   const [warningCount, setWarningCount] = useState(0)
+  const [securityReason, setSecurityReason] = useState('')
+  const [isOffline, setIsOffline] = useState(() => !navigator.onLine)
   const hasEnteredFullscreen = useRef(false)
 
-  const registerSecurityWarning = useCallback(() => {
+  const registerSecurityWarning = useCallback((reason = 'Fokus halaman berubah.') => {
     setWarningCount((count) => count + 1)
+    setSecurityReason(reason)
     setIsSecurityOverlayVisible(true)
   }, [])
 
@@ -58,17 +61,38 @@ export function useExamSecurity() {
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
-        registerSecurityWarning()
+        registerSecurityWarning('Halaman ujian disembunyikan atau tab berpindah.')
       }
     }
 
     const handleWindowBlur = () => {
-      registerSecurityWarning()
+      registerSecurityWarning('Window ujian kehilangan fokus.')
     }
 
     const handleFullscreenChange = () => {
       if (hasEnteredFullscreen.current && !document.fullscreenElement) {
-        registerSecurityWarning()
+        registerSecurityWarning('Mode fullscreen ditutup.')
+      }
+    }
+
+    const handleOffline = () => {
+      setIsOffline(true)
+      registerSecurityWarning('Koneksi internet terputus. Ujian dibekukan sampai koneksi kembali.')
+    }
+
+    const handleOnline = () => {
+      setIsOffline(false)
+      setIsSecurityOverlayVisible(false)
+      setSecurityReason('')
+    }
+
+    const detectDebuggerPause = () => {
+      const startedAt = performance.now()
+      debugger
+      const elapsed = performance.now() - startedAt
+
+      if (elapsed > 100) {
+        registerSecurityWarning(`Jeda debugger ${Math.round(elapsed)}ms terdeteksi.`)
       }
     }
 
@@ -86,6 +110,9 @@ export function useExamSecurity() {
     document.addEventListener('selectstart', blockDocumentAction)
     document.addEventListener('dragstart', blockDocumentAction)
     window.addEventListener('blur', handleWindowBlur)
+    window.addEventListener('offline', handleOffline)
+    window.addEventListener('online', handleOnline)
+    const debuggerTimer = window.setInterval(detectDebuggerPause, 1000)
 
     return () => {
       document.removeEventListener('keydown', handleKeyDown, true)
@@ -98,6 +125,9 @@ export function useExamSecurity() {
       document.removeEventListener('selectstart', blockDocumentAction)
       document.removeEventListener('dragstart', blockDocumentAction)
       window.removeEventListener('blur', handleWindowBlur)
+      window.removeEventListener('offline', handleOffline)
+      window.removeEventListener('online', handleOnline)
+      window.clearInterval(debuggerTimer)
     }
   }, [registerSecurityWarning])
 
@@ -105,6 +135,8 @@ export function useExamSecurity() {
     containerRef,
     warningCount,
     isSecurityOverlayVisible,
+    isOffline,
+    securityReason,
     activateSecureMode,
   }
 }

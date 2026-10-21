@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import { removeExamHoneypot, scanExamEnvironment } from './securityEngine'
 
 function readManagedRuntimeStatus() {
   try {
@@ -35,12 +36,15 @@ function readManagedRuntimeStatus() {
     }
     console.groupEnd()
 
+    const environmentScan = scanExamEnvironment()
+
     return {
       isTrustedRuntime: Boolean(
-        activeExtensions.length === 0,
+        activeExtensions.length === 0 && environmentScan.clean,
       ),
       hasExtensionAudit,
       activeExtensions,
+      environmentScan,
     }
   } catch (error) {
     console.error('[Exam Runtime] Audit ekstensi gagal:', error)
@@ -48,6 +52,7 @@ function readManagedRuntimeStatus() {
       isTrustedRuntime: false,
       hasExtensionAudit: false,
       activeExtensions: [],
+      environmentScan: { clean: false, signals: ['audit-error'] },
     }
   }
 }
@@ -70,7 +75,20 @@ function RuntimeBlockedScreen({ audit }) {
     >
       <section style={{ maxWidth: '520px' }}>
         <h1 style={{ marginBottom: '12px' }}>Ujian tidak dapat dimulai</h1>
-        {hasActiveExtensions ? (
+        {audit.environmentScan && !audit.environmentScan.clean ? (
+          <>
+            <p style={{ lineHeight: 1.6 }}>
+              Jejak userscript atau injector terdeteksi. Matikan script/ekstensi yang mencurigakan lalu refresh halaman.
+            </p>
+            <ul style={{ textAlign: 'left', lineHeight: 1.8 }}>
+              {(audit.environmentScan.detections || []).map((detection, index) => (
+                <li key={`${detection.type}-${detection.source}-${index}`}>
+                  <strong>{detection.type}</strong>: {detection.source}
+                </li>
+              ))}
+            </ul>
+          </>
+        ) : hasActiveExtensions ? (
           <>
             <p style={{ lineHeight: 1.6 }}>
               Ekstensi aktif terdeteksi. Tutup atau nonaktifkan ekstensi berikut lalu buka ulang Exam Browser:
@@ -98,6 +116,8 @@ export default function ExamRuntimeGate({ children }) {
 
   useEffect(() => {
     setAudit(readManagedRuntimeStatus())
+
+    return () => removeExamHoneypot()
   }, [])
 
   if (!audit) {
